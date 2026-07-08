@@ -99,6 +99,7 @@ async function registerPushToken(supermarkets, tags) {
     });
     const token = tokenData.data;
     console.log('Push token:', token);
+    await AsyncStorage.setItem('@foodalert_push_token', token);
 
     const { error } = await supabase
       .from('push_tokens')

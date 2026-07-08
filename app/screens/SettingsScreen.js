@@ -3,7 +3,8 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Button, Chip, Title, List, Divider, Switch, Appbar } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SUPERMARKETS, getSupermarketLogo } from '../utils/SupermarketLogos';
+import { getSupermarketLogo, SUPERMARKETS } from '../utils/SupermarketLogos';
+import { supabase } from '../utils/supabase';
 
 // Vaste voedselcategorieën met emoji's
 const FOOD_TAGS = [
@@ -66,6 +67,7 @@ export default function SettingsScreen({ navigation }) {
       : [...supermarkets, id];
     setSupermarkets(updated);
     await AsyncStorage.setItem('@foodalert_supermarkets', JSON.stringify(updated));
+    await syncToSupabase(updated, tags);
   };
 
   const toggleTag = async (id) => {
@@ -74,11 +76,36 @@ export default function SettingsScreen({ navigation }) {
       : [...tags, id];
     setTags(updated);
     await AsyncStorage.setItem('@foodalert_tags', JSON.stringify(updated));
+    await syncToSupabase(supermarkets, updated);
   };
 
   const toggleNotifications = async (value) => {
     setNotifEnabled(value);
     await AsyncStorage.setItem('@foodalert_notifications', JSON.stringify(value));
+  };
+
+  const syncToSupabase = async (sm, tg) => {
+    try {
+      const token = await AsyncStorage.getItem('@foodalert_push_token');
+      if (!token) {
+        console.log('Geen push token gevonden — opnieuw registreren bij volgende app start');
+        return;
+      }
+      const { error } = await supabase
+        .from('push_tokens')
+        .upsert({
+          token,
+          supermarkets: sm.join(','),
+          tags: tg.join(','),
+        }, { onConflict: 'token' });
+      if (error) {
+        console.error('Supabase sync error:', error.message);
+      } else {
+        console.log('Instellingen gesynchroniseerd naar Supabase');
+      }
+    } catch (e) {
+      console.error('Sync error:', e);
+    }
   };
 
   const resetOnboarding = async () => {
