@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Image } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Title, Paragraph, Chip, IconButton, Searchbar, Button } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { getSupermarketLogo, SUPERMARKETS } from '../utils/SupermarketLogos';
 import { supabase } from '../utils/supabase';
 
@@ -20,7 +22,6 @@ function getEmojiForTag(tagId) {
 }
 
 function parseSupermarkets(sm) {
-  // Supabase text kolom: "jumbo,lidl" of leeg string
   if (!sm || sm === '') return [];
   return sm.split(',').map(s => s.trim()).filter(Boolean);
 }
@@ -58,7 +59,6 @@ function matchesUser(recall, selectedSupermarketIds, selectedTags) {
   const smList = parseSupermarkets(recall.supermarkets);
 
   if (selectedSupermarketIds.length === 0) {
-    // doorgaan
   } else {
     const hasOverlap = smList.some(smId => selectedSupermarketIds.includes(smId));
     if (smList.length === 0) {
@@ -74,6 +74,48 @@ function matchesUser(recall, selectedSupermarketIds, selectedTags) {
 
   const textToCheck = (recall.title + ' ' + recall.product).toLowerCase();
   return selectedTags.some(tag => textToCheck.includes(tag.toLowerCase()));
+}
+
+async function registerPushToken(supermarkets, tags) {
+  if (!Device.isDevice) {
+    console.log('Push notificaties werken alleen op een fysiek apparaat');
+    return;
+  }
+
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.log('Push notificatie toestemming geweigerd');
+      return;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: '0533ef1c-4de4-4ffb-9f5e-81279808dddd'
+    });
+    const token = tokenData.data;
+    console.log('Push token:', token);
+
+    const { error } = await supabase
+      .from('push_tokens')
+      .upsert({
+        token,
+        supermarkets: supermarkets.join(','),
+        tags: tags.join(','),
+      }, { onConflict: 'token' });
+
+    if (error) {
+      console.error('Supabase push token error:', error.message);
+    } else {
+      console.log('Push token opgeslagen in Supabase');
+    }
+  } catch (e) {
+    console.error('Push token error:', e);
+  }
 }
 
 export default function HomeScreen({ navigation }) {
@@ -100,6 +142,19 @@ export default function HomeScreen({ navigation }) {
       console.error('Fetch error:', e);
     }
   };
+
+  useEffect(() => {
+    const loadAndRegister = async () => {
+      const sm = await AsyncStorage.getItem('@foodalert_supermarkets');
+      const tg = await AsyncStorage.getItem('@foodalert_tags');
+      const parsedSm = sm ? JSON.parse(sm) : [];
+      const parsedTg = tg ? JSON.parse(tg) : [];
+      setSupermarkets(parsedSm);
+      setTags(parsedTg);
+      await registerPushToken(parsedSm, parsedTg);
+    };
+    loadAndRegister();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
