@@ -1,0 +1,29 @@
+Privacybeleid FoodAlert
+Laatst bijgewerkt: 7 juli 2026
+
+FoodAlert neemt jouw privacy serieus. Dit privacybeleid legt uit welke gegevens we wel en niet verzamelen wanneer je onze app gebruikt.
+
+1. Geen account nodig
+Je kunt FoodAlert gebruiken zonder een account aan te maken. We vragen geen e-mailadres, naam, telefoonnummer of andere persoonlijke gegevens.
+
+2. Welke gegevens slaan we op?
+We slaan alleen anonieme gebruiksgegevens op om de app te verbeteren:
+- App-bezoeken: hoe vaak de app geopend wordt (zonder te koppelen aan jou als persoon)
+- Pushmeldingen: of je op een melding klikt (alleen het aantal klikken, niet wie)
+Deze gegevens zijn volledig anoniem en kunnen niet worden herleid naar jou als individu.
+
+3. Welke gegevens slaan we NIET op?
+- Geen naam, e-mailadres of telefoonnummer
+- Geen locatiegegevens
+- Geen aankoopgeschiedenis
+- Geen camera- of fototoegang
+- Geen contacten
+
+4. Jouw voorkeuren
+Je geselecteerde supermarkten en productcategorieen worden alleen lokaal op jouw telefoon opgeslagen (via AsyncStorage). Deze gegevens verlaten jouw apparaat niet.
+
+5. Pushmeldingen
+Als je pushmeldingen inschakelt, gebruiken we jouw unieke apparaattoken om meldingen te versturen. Dit token is anoniem en wordt alleen gebruikt om meldingen te bezorgen, niet voor tracking of advertenties.
+
+6. Contact
+Vragen over dit privacybeleid? Neem contact op via support@foodalert.nl
