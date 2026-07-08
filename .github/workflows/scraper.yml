@@ -1,0 +1,25 @@
+name: FoodAlert Scraper
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Elke 15 minuten
+  workflow_dispatch:         # Handmatig triggeren mogelijk
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install requests beautifulsoup4
+
+      - name: Run scraper
+        run: python backend/scraper.py

@@ -16,7 +16,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "nl.foodalert.app"
+      "bundleIdentifier": "nl.foodalert.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -36,6 +39,11 @@
           "color": "#E53935"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0533ef1c-4de4-4ffb-9f5e-81279808dddd"
+      }
+    }
   }
 }

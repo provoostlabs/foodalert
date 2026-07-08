@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-FoodAlert Scraper → Supabase
-Monitert NVWA en productwaarschuwing.nl voor nieuwe voedselveiligheid meldingen.
-Schrijft alleen nieuwe recalls naar Supabase.
+FoodAlert Scraper -> Supabase
+Scant productwaarschuwing.nl elke run voor nieuwe food recalls.
+Schrijft alleen nieuwe recalls naar Supabase (geen duplicaten).
 """
 
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-import json
+from datetime import datetime
 import re
 import sys
 
@@ -23,9 +22,10 @@ HEADERS = {
     "Prefer": "return=minimal",
 }
 
-SOURCES = {
-    "nvwa": "https://www.nvwa.nl/actueel/veiligheidswaarschuwingen/overzicht",
-    "productwaarschuwing": "https://www.productwaarschuwing.nl/",
+MONTHS_NL = {
+    'januari': '01', 'februari': '02', 'maart': '03', 'april': '04',
+    'mei': '05', 'juni': '06', 'juli': '07', 'augustus': '08',
+    'september': '09', 'oktober': '10', 'november': '11', 'december': '12'
 }
 
 SUPERMARKT_KEYWORDS = {
@@ -43,10 +43,51 @@ SUPERMARKT_KEYWORDS = {
     "poiesz": ["poiesz"],
     "ekoplaza": ["ekoplaza", "eko plaza"],
     "amazingoriental": ["amazing oriental"],
+    "gamma": ["gamma"],
+    "karwei": ["karwei"],
+    "decathlon": ["decathlon"],
+    "tkmaxx": ["tk maxx", "tkmaxx"],
+    "kik": ["kik "],
 }
 
+NON_FOOD = [
+    "step", "elektrische step", "stuurpen", "b'twin", "btwin",
+    "barbecue", "gasbarbecue", "plancha", "grill",
+    "bordspel", "magnetisch", "black stones",
+    "autostoel", "adapter", "kinderwagen", "kinderwagenonderstel",
+    "helm", "ruitersporthelm",
+    "drinkglas", "glazen",
+    "projector", "mini-projector",
+    "tas", "opvouwbare tas",
+    "wandelschoen", "schoenen",
+    "speelgoed", "knuffel", "knuffelkonijn",
+    "braadpan", "gietijzeren braadpan", "gietijzeren",
+    "contactgrill", "enfinigy",
+    "spatel",
+    "magneten", "magnetische",
+]
 
-def detect_supermarket(text):
+FOOD = [
+    "chocolade", "melkchocolade", "caramel", "pesto", "mascarpone",
+    "walnoot", "noten", "allergenen", "allergie",
+    "gehakt", "rundergehakt", "bapao", "kip", "rund", "vlees",
+    "zeesalade", "wakame", "nori", "listeria", "salmonella",
+    "croissant", "brood", "worst", "worsten", "bbq", "barbecue worst",
+    "hondenvoer", "kattenvoer", "hondenvoeding", "dierenvoer", "voer",
+    "oester", "bevroren", "mayo", "mayoneur",
+    "groenteschijf", "taart", "caramel crush",
+    "groente", "fruit", "vis",
+]
+
+
+def parse_date(date_str):
+    parts = date_str.strip().lower().split()
+    if len(parts) == 3 and parts[1] in MONTHS_NL:
+        return f"{parts[2]}-{MONTHS_NL[parts[1]]}-{parts[0].zfill(2)}"
+    return date_str
+
+
+def detect_supermarkets(text):
     text_lower = text.lower()
     found = []
     for sm_id, keywords in SUPERMARKT_KEYWORDS.items():
@@ -54,30 +95,27 @@ def detect_supermarket(text):
             if kw in text_lower:
                 found.append(sm_id)
                 break
-    return found
+    return list(set(found))
 
 
-def is_food_related(text):
-    text_lower = text.lower()
-    food_keywords = [
-        "terugroep", "terugroepactie", "voedsel", "product", "bacterie",
-        "allergeen", "salmonella", "listeria", "e-coli", "besmetting",
-        "melk", "brood", "kaas", "vlees", "groente", "fruit", "chocolade",
-        "noten", "pinda", "yoghurt", "salade", "gehakt", "kip", "rund",
-        "hondenvoer", "kattenvoer", "voeding", "diepvries", "pasta",
-        "worst", "saucijs", "biefstuk", "hamburger", "schnitzel",
-        "mayo", "sauce", "dressing", "oesters", "vis", "garnalen",
-        "worst", "paté", "pastei", "croissant", "bagel", "wrap",
-    ]
-    non_food = [
-        "speelgoed", "powerbank", "step", "fiets", "schoenen", "kleding",
-        "elektronica", "accu", "lamp", "kraan", "autostoel", "bordspel",
-        "projector", "contactgrill", "helm", "drinkglas", "kinderwagen",
-        "wandelschoen", "grill", "power", "spatel", "tas", "kabel",
-    ]
-    has_food = any(kw in text_lower for kw in food_keywords)
-    has_non_food = any(kw in text_lower for kw in non_food)
-    return has_food and not has_non_food
+def is_food_related(title, desc):
+    text = (title + " " + desc).lower()
+    has_food = any(kw in text for kw in FOOD)
+    has_non_food = any(kw in text for kw in NON_FOOD)
+    if has_non_food and not has_food:
+        return False
+    if has_food:
+        return True
+    return not has_non_food
+
+
+def determine_severity(title, desc):
+    text = (title + " " + desc).lower()
+    if any(kw in text for kw in ["salmonella", "listeria", "e-coli", "glas", "kanker", "methyleendianiline"]):
+        return "high"
+    elif any(kw in text for kw in ["allergenen", "allergie", "noten", "walnoot", "soja"]):
+        return "medium"
+    return "low"
 
 
 def fetch_existing_titles():
@@ -93,10 +131,113 @@ def fetch_existing_titles():
         return set()
 
 
+def fetch_productwaarschuwing():
+    """Scrape productwaarschuwing.nl voor food recalls."""
+    try:
+        resp = requests.get(
+            "https://www.productwaarschuwing.nl/",
+            timeout=30,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        recalls = []
+        articles = soup.find_all("article")
+
+        for article in articles:
+            # Find title link (in h2, h3, or h1)
+            title_elem = None
+            for header in article.find_all(["h2", "h3", "h1"]):
+                link = header.find("a", href=re.compile(r'/\d{4}/\d{2}/'))
+                if link:
+                    title_elem = link
+                    break
+
+            if not title_elem:
+                title_elem = article.find("a", href=re.compile(r'/\d{4}/\d{2}/[^/]+/$'))
+
+            if not title_elem:
+                continue
+
+            href = title_elem.get("href", "")
+            if "#more" in href or not href:
+                continue
+
+            title = title_elem.get_text(strip=True)
+            if not title or len(title) < 5:
+                continue
+
+            # Find date
+            date_text = ""
+            time_elem = article.find("time")
+            if time_elem:
+                date_text = time_elem.get_text(strip=True)
+            else:
+                for text in article.stripped_strings:
+                    match = re.match(r'^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$', text.strip())
+                    if match:
+                        date_text = text.strip()
+                        break
+
+            # Find description
+            desc = ""
+            content = article.find("div", class_=re.compile("entry-content|post-content|content"))
+            if content:
+                texts = []
+                for elem in content.find_all(string=True):
+                    t = elem.strip()
+                    if t and t != "Lees meer!" and len(t) > 10 and not t.startswith("http"):
+                        texts.append(t)
+                if texts:
+                    desc = " ".join(texts[:3])
+
+            if not desc:
+                all_text = article.get_text(separator=" ", strip=True)
+                desc = all_text.replace(title, "").strip()
+                desc = re.sub(r'\s+', ' ', desc)
+                desc = desc.replace("Lees meer!", "").strip()
+
+            desc = desc.strip()
+            if len(desc) > 300:
+                desc = desc[:297] + "..."
+
+            # Parse date
+            parsed_date = parse_date(date_text)
+
+            # Extract product name
+            product = title
+            for prefix in ["Terugroepactie ", "Allergenenwaarschuwing "]:
+                if product.startswith(prefix):
+                    product = product[len(prefix):]
+                    break
+
+            # Detect supermarkets
+            supermarkets = detect_supermarkets(title + " " + desc)
+
+            # Check if food-related
+            if not is_food_related(title, desc):
+                continue
+
+            recalls.append({
+                "title": title,
+                "supermarkets": ",".join(supermarkets),
+                "product": product,
+                "reason": desc,
+                "date": parsed_date,
+                "severity": determine_severity(title, desc),
+                "source": "productwaarschuwing",
+            })
+
+        return recalls
+    except Exception as e:
+        print(f"ERROR fetching productwaarschuwing.nl: {e}")
+        return []
+
+
 def save_to_supabase(recalls):
     """Insert alleen nieuwe recalls in Supabase."""
     if not recalls:
-        print("Geen nieuwe recalls om op te slaan.")
         return 0
 
     url = f"{SUPABASE_URL}/rest/v1/recalls"
@@ -113,52 +254,9 @@ def save_to_supabase(recalls):
     return count
 
 
-def fetch_productwaarschuwing():
-    try:
-        resp = requests.get(
-            SOURCES["productwaarschuwing"],
-            timeout=30,
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-        )
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        recalls = []
-        articles = soup.find_all("article", class_=re.compile("post|recall"))
-
-        for article in articles[:30]:
-            title_elem = article.find("h2") or article.find("a")
-            if not title_elem:
-                continue
-            title = title_elem.get_text(strip=True)
-            link = title_elem.get("href", "")
-            if link and not link.startswith("http"):
-                link = "https://www.productwaarschuwing.nl" + link
-
-            supermarkets = detect_supermarket(title)
-            date_elem = article.find("time") or article.find(text=re.compile(r"\d{1,2}\s+[a-zA-Z]+\s+\d{4}"))
-            date_str = date_elem.get_text(strip=True) if date_elem else datetime.now().strftime("%d %B %Y")
-
-            if not is_food_related(title):
-                continue
-
-            recalls.append({
-                "title": title,
-                "supermarkets": ",".join(supermarkets),
-                "product": title.replace("Terugroepactie ", "").strip(),
-                "reason": "Zie productwaarschuwing.nl voor details.",
-                "date": date_str,
-                "severity": "medium",
-                "source": "productwaarschuwing",
-            })
-        return recalls
-    except Exception as e:
-        print(f"ERROR fetching productwaarschuwing.nl: {e}")
-        return []
-
-
 def main():
     print(f"\n{'='*60}")
-    print(f"FoodAlert Scraper → Supabase | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"FoodAlert Scraper -> Supabase | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}\n")
 
     print("Ophalen bestaande recalls...")
@@ -167,7 +265,7 @@ def main():
 
     print("\nScrapen productwaarschuwing.nl...")
     new_recalls = fetch_productwaarschuwing()
-    print(f"  {len(new_recalls)} food recalls gevonden.")
+    print(f"  {len(new_recalls)} food recalls gevonden op pagina.")
 
     # Filter alleen nieuwe
     unique_new = []
@@ -183,8 +281,10 @@ def main():
         print("\nOpslaan in Supabase...")
         saved = save_to_supabase(unique_new)
         print(f"  {saved} opgeslagen.")
+        for r in unique_new:
+            print(f"    + {r['title'][:60]}")
     else:
-        print("\nGeen nieuwe recalls — niets opgeslagen.")
+        print("\nGeen nieuwe recalls -- niets opgeslagen.")
 
     print(f"\n{'='*60}")
     print("Klaar!")
