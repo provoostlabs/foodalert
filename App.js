@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import OnboardingSupermarkets from './app/screens/OnboardingSupermarkets';
@@ -30,11 +31,12 @@ export default function App() {
   const [initialRoute, setInitialRoute] = useState('OnboardingSupermarkets');
 
   useEffect(() => {
-    checkOnboardingStatus();
+    prepareApp();
   }, []);
 
-  const checkOnboardingStatus = async () => {
+  const prepareApp = async () => {
     try {
+      await SplashScreen.preventAutoHideAsync();
       const onboarded = await AsyncStorage.getItem('@foodalert_onboarded');
       if (onboarded === 'true') {
         setInitialRoute('Home');
@@ -42,6 +44,8 @@ export default function App() {
     } catch (e) {
       console.error(e);
     } finally {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await SplashScreen.hideAsync();
       setIsLoading(false);
     }
   };
