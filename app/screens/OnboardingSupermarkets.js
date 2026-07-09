@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button, Chip, Title, Paragraph, ProgressBar } from 'react-native-paper';
+import { Text, Button, Chip, Title, ProgressBar } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SUPERMARKETS, getSupermarketLogo } from '../utils/SupermarketLogos';
 
@@ -24,10 +24,7 @@ export default function OnboardingSupermarkets({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <ProgressBar progress={0.33} color="#E53935" style={styles.progress} />
-        <Title style={styles.title}>Welke supermarkten bezoek je?</Title>
-        <Paragraph style={styles.subtitle}>
-          Kies de supermarkten waarvan je voedselveiligheid alerts wilt ontvangen.
-        </Paragraph>
+        <Title style={styles.title}>Kies de supermarkten waarvan je voedselveiligheid alerts wilt ontvangen.</Title>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -80,7 +77,6 @@ const styles = StyleSheet.create({
   header: { padding: 24, paddingTop: 40 },
   progress: { marginBottom: 24, height: 6, borderRadius: 3 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#212121', marginBottom: 8 },
-  subtitle: { fontSize: 16, color: '#666', lineHeight: 22 },
   scrollContent: { padding: 16, paddingBottom: 100 },
   chipsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { margin: 4, borderRadius: 20, borderWidth: 1.5, borderColor: '#E0E0E0', paddingLeft: 4 },

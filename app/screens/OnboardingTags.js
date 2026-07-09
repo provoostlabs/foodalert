@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button, Chip, Title, Paragraph, ProgressBar, Card } from 'react-native-paper';
+import { Text, Button, Chip, Title, ProgressBar, Card } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Vaste voedselcategorieën met emoji's — gebruiker kan alleen hieruit kiezen
@@ -74,10 +74,7 @@ export default function OnboardingTags({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <ProgressBar progress={0.66} color="#E53935" style={styles.progress} />
-        <Title style={styles.title}>Welke producten koop je vaak?</Title>
-        <Paragraph style={styles.subtitle}>
-          Kies de producten waarvan je meldingen wilt ontvangen. Je kunt dit ook overslaan.
-        </Paragraph>
+        <Title style={styles.title}>Kies de producten waarvan je meldingen wilt ontvangen. Je kunt dit ook overslaan.</Title>
       </View>
 
       <FlatList
@@ -111,7 +108,6 @@ const styles = StyleSheet.create({
   header: { padding: 24, paddingTop: 16 },
   progress: { marginBottom: 20, height: 6, borderRadius: 3 },
   title: { fontSize: 26, fontWeight: 'bold', color: '#212121', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#666', lineHeight: 22 },
   gridContent: { padding: 12, paddingBottom: 20 },
   tagCard: {
     flex: 1,
