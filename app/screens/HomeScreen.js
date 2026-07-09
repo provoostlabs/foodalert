@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Image, Platform } from 'react-native';
+import { View, StyleSheet, FlatList, RefreshControl, Image, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Card, Title, Paragraph, Chip, IconButton, Searchbar, Button } from 'react-native-paper';
+import { Text, Card, Title, Paragraph, Chip, Searchbar, Button } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
@@ -9,28 +9,16 @@ import * as Device from 'expo-device';
 import { getSupermarketLogo, SUPERMARKETS } from '../utils/SupermarketLogos';
 import { supabase } from '../utils/supabase';
 
-const FOOD_TAGS_EMOJIS = {
-  melk: '🥛', brood: '🍞', kaas: '🧀', yoghurt: '🍦', kip: '🍗',
-  vleeswaren: '🥓', rundvlees: '🥩', varkensvlees: '🍖', vis: '🐟',
-  noten: '🥜', chocolade: '🍫', groente: '🥬', fruit: '🍎',
-  eieren: '🥚', boter: '🧈', pasta: '🍝', rijst: '🍚',
-  sappen: '🧃', frisdrank: '🥤', koekjes: '🍪', bier: '🍺', babyvoeding: '🍼',
-};
-
-function getEmojiForTag(tagId) {
-  return FOOD_TAGS_EMOJIS[tagId] || '🍽️';
-}
-
 function parseSupermarkets(sm) {
   if (!sm || sm === '') return [];
   return sm.split(',').map(s => s.trim()).filter(Boolean);
 }
 
-function getSeverityColor(severity) {
+function getSeverityColors(severity) {
   switch (severity) {
-    case 'high': return '#E53935';
-    case 'medium': return '#FF9800';
-    default: return '#9E9E9E';
+    case 'high': return { bg: '#FFEBEE', text: '#E53935', border: '#E53935' };
+    case 'medium': return { bg: '#FFF3E0', text: '#FF9800', border: '#FF9800' };
+    default: return { bg: '#FFFDE7', text: '#F9A825', border: '#F9A825' };
   }
 }
 
@@ -40,6 +28,20 @@ function getSeverityLabel(severity) {
     case 'medium': return 'Matig';
     default: return 'Laag';
   }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const monthsNL = {
+    '01': 'januari', '02': 'februari', '03': 'maart', '04': 'april',
+    '05': 'mei', '06': 'juni', '07': 'juli', '08': 'augustus',
+    '09': 'september', '10': 'oktober', '11': 'november', '12': 'december',
+  };
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${parseInt(isoMatch[3])} ${monthsNL[isoMatch[2]]} ${isoMatch[1]}`;
+  }
+  return dateStr;
 }
 
 function getPrimarySupermarketName(recall) {
@@ -193,14 +195,19 @@ export default function HomeScreen({ navigation }) {
   const renderRecall = ({ item }) => {
     const smName = getPrimarySupermarketName(item);
     const logo = getSupermarketLogoForRecall(item);
+    const sev = getSeverityColors(item.severity);
+    const formattedDate = formatDate(item.date);
+    
     return (
-      <Card style={styles.card}>
+      <Card style={[styles.card, { borderLeftWidth: 4, borderLeftColor: sev.border }]}>
         <Card.Content>
           <View style={styles.cardHeader}>
-            <Chip style={{ backgroundColor: getSeverityColor(item.severity) + '20' }} textStyle={{ color: getSeverityColor(item.severity), fontWeight: 'bold' }}>
-              {getSeverityLabel(item.severity)}
-            </Chip>
-            <Text style={styles.date}>{item.date}</Text>
+            <View style={[styles.severityBadge, { backgroundColor: sev.bg }]}>
+              <Text style={[styles.severityText, { color: sev.text }]}>
+                {getSeverityLabel(item.severity)}
+              </Text>
+            </View>
+            <Text style={styles.date}>{formattedDate}</Text>
           </View>
           <Title style={styles.cardTitle}>{item.title}</Title>
           <Paragraph style={styles.reason}>{item.reason}</Paragraph>
@@ -209,13 +216,10 @@ export default function HomeScreen({ navigation }) {
               {logo && (
                 <Image source={logo} style={styles.logoImage} />
               )}
-              <Chip style={styles.supermarketChip}>
-                {smName}
-              </Chip>
+              <View style={styles.supermarketBadge}>
+                <Text style={styles.supermarketText}>{smName}</Text>
+              </View>
             </View>
-            <Chip icon="food" style={styles.productChip}>
-              {item.product}
-            </Chip>
           </View>
         </Card.Content>
       </Card>
@@ -224,47 +228,71 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with logo */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <View>
-            <Title style={styles.headerTitle}>FoodAlert</Title>
-            <Text style={styles.headerSubtitle}>Voedselveiligheid alerts</Text>
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require('../../assets/icon.png')} 
+              style={styles.headerLogo} 
+              resizeMode="contain"
+            />
+            <View>
+              <Text style={styles.headerTitle}>FoodAlert</Text>
+              <Text style={styles.headerSubtitle}>Voedselveiligheid alerts</Text>
+            </View>
           </View>
-          <IconButton
-            icon="cog"
-            size={24}
+          <TouchableOpacity 
+            style={styles.settingsButton}
             onPress={() => navigation.navigate('Settings')}
-          />
+          >
+            <Text style={{ fontSize: 18 }}>⚙️</Text>
+          </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Search bar with shadow */}
+      <View style={styles.searchContainer}>
         <Searchbar
           placeholder="Zoek meldingen..."
           onChangeText={setSearchQuery}
           value={searchQuery}
           style={styles.searchBar}
           iconColor="#E53935"
+          inputStyle={{ fontSize: 15 }}
         />
-        <View style={styles.filterInfo}>
-          <View style={styles.filterLeft}>
-            <Image source={require('../../assets/bell-icon.png')} style={styles.bellIcon} />
-            <Text style={styles.filterText}>
-              {supermarkets.length > 0 
-                ? `${supermarkets.length} supermarkt${supermarkets.length !== 1 ? 'en' : ''} geselecteerd`
-                : 'Alle supermarkten geselecteerd'
-              }
-            </Text>
-          </View>
-          <Button
-            mode="contained"
-            onPress={() => navigation.navigate('Settings')}
-            buttonColor="#E53935"
-            textColor="#FFFFFF"
-            style={styles.wijzigButton}
-          >
-            Wijzig
-          </Button>
-        </View>
       </View>
 
+      {/* Filter card with shadow */}
+      <View style={styles.filterCard}>
+        <View style={styles.filterLeft}>
+          <Image source={require('../../assets/bell-icon.png')} style={styles.bellIcon} />
+          <View>
+            <Text style={styles.filterMainText}>
+              {supermarkets.length > 0 
+                ? `${supermarkets.length} winkel${supermarkets.length !== 1 ? 's' : ''} geselecteerd`
+                : 'Alle winkels geselecteerd'
+              }
+            </Text>
+            <Text style={styles.filterSubText}>Je ontvangt meldingen</Text>
+          </View>
+        </View>
+        <Button
+          mode="contained"
+          onPress={() => navigation.navigate('Settings')}
+          buttonColor="#E53935"
+          textColor="#FFFFFF"
+          style={styles.wijzigButton}
+          labelStyle={{ fontSize: 14, fontWeight: 'bold' }}
+        >
+          Wijzig
+        </Button>
+      </View>
+
+      {/* Section title */}
+      <Text style={styles.sectionTitle}>Recente meldingen</Text>
+
+      {/* Recalls list */}
       <FlatList
         data={filteredRecalls}
         renderItem={renderRecall}
@@ -287,27 +315,115 @@ export default function HomeScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFAFA' },
-  header: { padding: 16, paddingTop: 8, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#E53935' },
-  headerSubtitle: { fontSize: 14, color: '#666' },
-  searchBar: { backgroundColor: '#F5F5F5', borderRadius: 12, elevation: 0 },
-  filterInfo: { marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  filterLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  bellIcon: { width: 24, height: 24, marginRight: 8, resizeMode: 'contain' },
-  filterText: { fontSize: 14, color: '#333', fontWeight: '500' },
-  wijzigButton: { borderRadius: 6, paddingHorizontal: 10, minHeight: 28 },
+  
+  // Header
+  header: { padding: 16, paddingTop: 8, backgroundColor: '#FFF' },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  logoContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerLogo: { width: 36, height: 36, borderRadius: 8 },
+  headerTitle: { fontSize: 22, fontWeight: 'bold', color: '#E53935' },
+  headerSubtitle: { fontSize: 13, color: '#888' },
+  
+  // Settings button
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  
+  // Search bar
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFF',
+  },
+  searchBar: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 12,
+    elevation: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+  },
+  
+  // Filter card
+  filterCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 14,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  filterLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  bellIcon: { width: 28, height: 28, resizeMode: 'contain' },
+  filterMainText: { fontSize: 15, fontWeight: '600', color: '#333' },
+  filterSubText: { fontSize: 13, color: '#888', marginTop: 2 },
+  wijzigButton: { borderRadius: 8, paddingHorizontal: 16 },
+  
+  // Section title
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginHorizontal: 16,
+    marginBottom: 10,
+  },
+  
+  // List
   listContent: { padding: 12, paddingBottom: 32 },
-  card: { marginBottom: 12, borderRadius: 12, elevation: 2, backgroundColor: '#FFF' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  date: { fontSize: 12, color: '#999' },
-  cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 6, lineHeight: 22 },
-  reason: { fontSize: 14, color: '#555', lineHeight: 20, marginBottom: 12 },
+  
+  // Card
+  card: { 
+    marginBottom: 12, 
+    borderRadius: 14, 
+    elevation: 1, 
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  severityBadge: { 
+    paddingHorizontal: 10, 
+    paddingVertical: 4, 
+    borderRadius: 6,
+  },
+  severityText: { fontSize: 12, fontWeight: 'bold' },
+  date: { fontSize: 13, color: '#999' },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 6, lineHeight: 22, color: '#222' },
+  reason: { fontSize: 13, color: '#777', lineHeight: 19, marginBottom: 12 },
   cardFooter: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  supermarketRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  logoImage: { width: 20, height: 20, borderRadius: 4 },
-  supermarketChip: { backgroundColor: '#F5F5F5', paddingLeft: 4 },
-  productChip: { backgroundColor: '#FFF3E0' },
+  supermarketRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoImage: { width: 24, height: 24, borderRadius: 4 },
+  supermarketBadge: {
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  supermarketText: { fontSize: 12, color: '#555', fontWeight: '500' },
+  
+  // Empty state
   emptyState: { alignItems: 'center', padding: 40 },
   emptyEmoji: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 8 },
