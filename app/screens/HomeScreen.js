@@ -279,11 +279,12 @@ export default function HomeScreen({ navigation }) {
         </View>
         <Button
           mode="contained"
+          compact
           onPress={() => navigation.navigate('Settings')}
           buttonColor="#E53935"
           textColor="#FFFFFF"
           style={styles.wijzigButton}
-          labelStyle={{ fontSize: 14, fontWeight: 'bold' }}
+          labelStyle={{ fontSize: 13, fontWeight: 'bold', marginHorizontal: 0 }}
         >
           Wijzig
         </Button>
@@ -377,7 +378,7 @@ const styles = StyleSheet.create({
   bellIcon: { width: 28, height: 28, resizeMode: 'contain' },
   filterMainText: { fontSize: 15, fontWeight: '600', color: '#333' },
   filterSubText: { fontSize: 13, color: '#888', marginTop: 2 },
-  wijzigButton: { borderRadius: 8, paddingHorizontal: 16 },
+  wijzigButton: { borderRadius: 8, paddingHorizontal: 8, minWidth: 0, alignSelf: 'center' },
   
   // Section title
   sectionTitle: {
