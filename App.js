@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { View, Image, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider as PaperProvider, DefaultTheme } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import OnboardingSupermarkets from './app/screens/OnboardingSupermarkets';
@@ -27,31 +27,37 @@ const theme = {
 };
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const [initialRoute, setInitialRoute] = useState('OnboardingSupermarkets');
 
   useEffect(() => {
-    prepareApp();
+    checkOnboardingStatus();
   }, []);
 
-  const prepareApp = async () => {
+  const checkOnboardingStatus = async () => {
     try {
-      await SplashScreen.preventAutoHideAsync();
       const onboarded = await AsyncStorage.getItem('@foodalert_onboarded');
       if (onboarded === 'true') {
         setInitialRoute('Home');
       }
     } catch (e) {
       console.error(e);
-    } finally {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      await SplashScreen.hideAsync();
-      setIsLoading(false);
     }
   };
 
-  if (isLoading) {
-    return null;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showSplash) {
+    return (
+      <View style={styles.splashContainer}>
+        <Image source={require('./assets/splash.png')} style={styles.splashImage} resizeMode="cover" />
+      </View>
+    );
   }
 
   return (
@@ -68,3 +74,14 @@ export default function App() {
     </PaperProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#FFD1D1',
+  },
+  splashImage: {
+    width: '100%',
+    height: '100%',
+  },
+});
