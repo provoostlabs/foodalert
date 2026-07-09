@@ -276,6 +276,35 @@ def should_notify(token, recall):
     
     # Supermarket check
     if token_sm_list:
+        # User has selected specific supermarkets
+        # If recall has no supermarket -> don't notify (user can't follow it)
+        if not recall_sm_list:
+            return False
+        # If recall has supermarkets but none match user's selection -> don't notify
+        sm_overlap = any(sm in token_sm_list for sm in recall_sm_list)
+        if not sm_overlap:
+            return False
+    
+    # Tag check
+    if token_tags_list and len(token_tags_list) < 15:
+        text = (recall.get("title", "") + " " + recall.get("product", "")).lower()
+        tag_match = any(tag.lower() in text for tag in token_tags_list)
+        if not tag_match:
+            return False
+    
+    return True
+    """Check of een token een notificatie moet krijgen voor deze recall."""
+    token_sm = token.get("supermarkets", "")
+    token_tags = token.get("tags", "")
+    recall_sm = recall.get("supermarkets", "")
+    
+    # Parse
+    token_sm_list = [s.strip() for s in token_sm.split(",") if s.strip()] if token_sm else []
+    token_tags_list = [t.strip() for t in token_tags.split(",") if t.strip()] if token_tags else []
+    recall_sm_list = [s.strip() for s in recall_sm.split(",") if s.strip()] if recall_sm else []
+    
+    # Supermarket check
+    if token_sm_list:
         # Token has specific supermarkets selected
         sm_overlap = any(sm in token_sm_list for sm in recall_sm_list)
         if not sm_overlap and recall_sm_list:
